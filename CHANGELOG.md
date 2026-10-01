@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.0.1 - 2026-10-01
+
 - `codes`: the registry of every error code Latere Apps answers with, each
   with its HTTP status, its user sentence and its hint, and `Lookup` to read
   one by name. `authorizer_unavailable` is the answer when the platform could
