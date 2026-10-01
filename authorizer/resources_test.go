@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/authz"
 )
 
@@ -84,6 +85,56 @@ func TestOtherKinds(t *testing.T) {
 		for k, v := range tc.want {
 			if got[k] != v {
 				t.Errorf("%s: %s is %v, want %v", name, k, got[k], v)
+			}
+		}
+	}
+}
+
+// TestAppActionsCarryTheAppID: every action within one app is of kind app
+// and carries the app's id, so a key whose one grant names the app covers
+// each of them for that app and for no other, and the two actions that
+// name no app yet, app.list and app.create, are covered by a grant over the
+// whole kind alone.
+func TestAppActionsCarryTheAppID(t *testing.T) {
+	claims := func(identifier string, actions ...string) map[string]any {
+		qualified := make([]any, len(actions))
+		for i, a := range actions {
+			qualified[i] = Core + ":" + a
+		}
+		return map[string]any{
+			"token_use":             authkit.TokenUsePAT,
+			"authorization_details": []any{map[string]any{"type": authkit.GrantType, "actions": qualified, "identifier": identifier}},
+		}
+	}
+	decide := func(c map[string]any, action string, res authz.Resource) bool {
+		grants, err := authz.ParseGrants(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := authz.Request{Subject: "https://issuer.example|u1", Claims: c, Action: action, Resource: res}
+		return authz.Restrict(Core, authz.Decision{Allow: true}, req, grants).Allow
+	}
+	for _, a := range Vocabulary().Actions {
+		if a.Kind != KindApp {
+			continue
+		}
+		mine := App{ID: "a1", Owner: "o"}.Resource()
+		other := App{ID: "a2", Owner: "o"}.Resource()
+		if mine.Kind != KindApp || mine.ID != "a1" {
+			t.Fatalf("%s: the resource is %+v", a.Name, mine)
+		}
+		oneApp := claims("a1", a.Name)
+		switch a.Name {
+		case ActionAppList, ActionAppCreate:
+			if decide(oneApp, a.Name, App{Owner: "o"}.Resource()) {
+				t.Errorf("%s names no app and a one-app grant covers it", a.Name)
+			}
+			if !decide(claims("", a.Name), a.Name, App{Owner: "o"}.Resource()) {
+				t.Errorf("%s: a grant over the kind does not cover it", a.Name)
+			}
+		default:
+			if !decide(oneApp, a.Name, mine) || decide(oneApp, a.Name, other) {
+				t.Errorf("%s: a grant naming a1 must cover a1 and not a2", a.Name)
 			}
 		}
 	}
