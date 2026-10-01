@@ -13,3 +13,7 @@ committed: the commit log already holds that.
 - `codes`: the registry of every error code Latere Apps answers with, each
   with its HTTP status, its user sentence and its hint, and `Lookup` to read
   one by name.
+- `authorizer`: the vocabulary an authorization endpoint for Apps is written
+  against: fifteen actions over four kinds as `authz.Vocabulary`, the
+  resource each question carries, and `WireLimits`, the limits an allow may
+  grant, with `DecodeLimits`.
