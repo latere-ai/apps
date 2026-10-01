@@ -17,3 +17,8 @@ committed: the commit log already holds that.
   against: fifteen actions over four kinds as `authz.Vocabulary`, the
   resource each question carries, and `WireLimits`, the limits an allow may
   grant, with `DecodeLimits`.
+- `codes`: `authorizer_unavailable`, the answer when the platform could not
+  check a caller's access; `workspace_membership_required` is gone, since
+  the platform decides membership; and the sentences of `internal_error`,
+  `forbidden`, `app_not_found` and `repository_quota_exceeded` name an
+  account or an organization rather than a workspace or a plan.
