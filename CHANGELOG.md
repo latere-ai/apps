@@ -10,6 +10,9 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+- `latere.ai/x/pkg` v0.90.2, the release past GO-2026-6615 and GO-2026-6505.
+  No OpenTelemetry module is in this module's build.
+
 - `manifest`: the grammar of `latere-app.yaml`. `Parse` refuses a key the
   platform does not know with its line, `Detect` tells a static site from a
   service by the files of a tree, `Resolve` applies the defaults and every
