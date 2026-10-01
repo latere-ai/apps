@@ -1,0 +1,9 @@
+- Respond short, precise, and concise.
+- If you didn't add a test, you didn't fix a bug. Every bug fix must include a reproducible test that fails without the fix and passes with it.
+- Commit frequently, one small scope diff at a time, as `scope: lowercase description`. Push to main once a full batch of work is complete and verified.
+- `go tool lateregate` runs the whole bar, the same one CI runs; every package clears a 90% coverage floor unless `.lateregate.yaml` exempts it with a reason.
+- Every package depends on the standard library alone: a client imports this module without a server's dependencies.
+- A code is never renamed or removed once a release carries it; a new code is an entry in `codes` before anything answers with it.
+- This repository is public. No Latere hostname, token, or internal reference anywhere but as a default or an example.
+- Every sentence is written for one reader (user, contributor, developer) and the register follows the reader; an error has one code, one fixed user sentence in `message`, and one developer detail in a separate field. The rule and the review checklist: https://github.com/latere-ai/pkg/blob/main/docs/writing/registers.md
+- A tag is a release, and a release has notes: write them under `## Unreleased` in CHANGELOG.md with the change, and cut with `go tool lateregate release vX.Y.Z`.

@@ -1,0 +1,16 @@
+# The per-push gate configuration for apps. Every check runs from
+# latere.ai/x/ci-gate, pinned in go.mod, so a gate that fails on a runner
+# fails the same way on a laptop. Only the values specific to this module
+# are here.
+
+license:
+  # The identifier every source file carries and the holder it names. There
+  # is no default: this is the decision the gate checks the tree against.
+  # `go tool lateregate license -w` writes the notice where it is missing.
+  spdx: Apache-2.0
+  holder: Latere AI
+
+# The identity shape of the family: a library, which verifies no token and
+# serves no request.
+identity:
+  role: none
