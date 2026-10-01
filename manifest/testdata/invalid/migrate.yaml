@@ -1,0 +1,3 @@
+kind: service
+service:
+  migrate: [one, two]

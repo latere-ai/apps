@@ -10,6 +10,14 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+- `manifest`: the grammar of `latere-app.yaml`. `Parse` refuses a key the
+  platform does not know with its line, `Detect` tells a static site from a
+  service by the files of a tree, `Resolve` applies the defaults and every
+  rule (components and routes, ranges against the platform's limits,
+  references, links, data services) and answers with the code and key a
+  manifest is refused with, and `Schema` is the JSON Schema of the file.
+- `codes`: the codes a manifest, a deploy's limits and a release are
+  refused with, from `manifest_unknown_key` to `release_not_found`.
 - `codes`: the codes of a build (`source_fetch_failed`, `install_failed`,
   `build_failed`, `static_dir_missing`, `build_timeout` and the rest), of an
   app's address at the edge (`unknown_application`, `no_deploy`,

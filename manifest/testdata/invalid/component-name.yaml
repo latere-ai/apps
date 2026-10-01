@@ -1,0 +1,2 @@
+components:
+  Web: {kind: static, route: /}

@@ -1,0 +1,28 @@
+name: shop
+components:
+  web:
+    kind: static
+    path: apps/web
+    route: /
+    static:
+      dir: dist
+      spa: true
+  api:
+    kind: service
+    path: apps/api
+    route: /api
+    strip_prefix: false
+    service:
+      port: 8080
+      health: /api/healthz
+      resources: {memory: 512Mi, cpu: 500m}
+      replicas: {min: 1, max: 1}
+    env:
+      LOG_LEVEL: info
+  nightly:
+    kind: cron
+    path: apps/api
+    schedule: "0 3 * * *"
+    start: node jobs/nightly.js
+env:
+  NODE_ENV: production

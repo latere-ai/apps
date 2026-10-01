@@ -1,0 +1,3 @@
+static:
+  headers:
+    - Cache-Control: no-store

@@ -2,7 +2,8 @@
 - If you didn't add a test, you didn't fix a bug. Every bug fix must include a reproducible test that fails without the fix and passes with it.
 - Commit frequently, one small scope diff at a time, as `scope: lowercase description`. Push to main once a full batch of work is complete and verified.
 - `go tool lateregate` runs the whole bar, the same one CI runs; every package clears a 90% coverage floor unless `.lateregate.yaml` exempts it with a reason.
-- `codes` and the manifest depend on the standard library alone, so a client imports them without a server's dependencies; `authorizer` imports `latere.ai/x/pkg/authz` and nothing else outside the standard library.
+- `codes` depends on the standard library alone and `manifest` on it and `github.com/goccy/go-yaml`, so a client imports them without a server's dependencies; `authorizer` imports `latere.ai/x/pkg/authz` and nothing else outside the standard library.
+- A manifest key is in three places that tests hold together: the grammar in `manifest/manifest.go`, the JSON Schema in `manifest/schema.json`, and the platform's reference; an error a manifest is refused with is a code of `codes`.
 - An action, a kind, a resource field or a limits member of `authorizer` is never renamed or removed; a new one is appended, and the frozen lists in its tests grow with it.
 - A code is never renamed or removed once a release carries it; a new code is an entry in `codes` before anything answers with it.
 - This repository is public. No Latere hostname, token, or internal reference anywhere but as a default or an example.

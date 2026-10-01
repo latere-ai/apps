@@ -4,10 +4,12 @@ go 1.27.0
 
 tool latere.ai/x/ci-gate/cmd/lateregate
 
-require latere.ai/x/pkg v0.90.1
+require (
+	github.com/goccy/go-yaml v1.19.2
+	latere.ai/x/pkg v0.90.1
+)
 
 require (
-	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	golang.org/x/mod v0.37.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
