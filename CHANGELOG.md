@@ -10,6 +10,12 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+- `codes`: the codes of a build (`source_fetch_failed`, `install_failed`,
+  `build_failed`, `static_dir_missing`, `build_timeout` and the rest), of an
+  app's address at the edge (`unknown_application`, `no_deploy`,
+  `no_preview`, `starting`, `rate_limited` and the rest), `private`, and
+  `capacity_exhausted`, each with its status, sentence and hint.
+
 ## v0.0.1 - 2026-10-01
 
 - `codes`: the registry of every error code Latere Apps answers with, each
