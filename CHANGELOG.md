@@ -17,7 +17,8 @@ committed: the commit log already holds that.
   references, links, data services) and answers with the code and key a
   manifest is refused with, and `Schema` is the JSON Schema of the file.
 - `codes`: the codes a manifest, a deploy's limits and a release are
-  refused with, from `manifest_unknown_key` to `release_not_found`.
+  refused with, from `manifest_unknown_key` to `release_not_found`, and
+  `ref_not_found` for a branch or commit the app repository does not have.
 - `codes`: the codes of a build (`source_fetch_failed`, `install_failed`,
   `build_failed`, `static_dir_missing`, `build_timeout` and the rest), of an
   app's address at the edge (`unknown_application`, `no_deploy`,

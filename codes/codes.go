@@ -240,6 +240,9 @@ var Codes = map[string]Code{
 	"release_not_found": {Name: "release_not_found", Status: 404,
 		Message: "This app has no release with that tag.",
 		Hint:    "`latere app releases` lists them."},
+	"ref_not_found": {Name: "ref_not_found", Status: 404,
+		Message: "That branch or commit does not exist on the app repository.",
+		Hint:    "Push it first, or check the name."},
 }
 
 // Lookup returns the entry for name and whether it exists.
