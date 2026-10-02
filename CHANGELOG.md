@@ -10,6 +10,13 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+- `codes`: the hints of the codes an app's visitor and the API answer today
+  name what works now (push a commit, push a `v` tag, the lists of deploys
+  and releases) instead of `latere app` commands that do not exist yet.
+  `unknown_application`, `no_deploy`, `no_preview`, `id_too_short`,
+  `app_not_found` and `release_not_found` change; no code, status or
+  message changes.
+
 - `latere.ai/x/pkg` v0.90.2, the release past GO-2026-6615 and GO-2026-6505.
   No OpenTelemetry module is in this module's build.
 
