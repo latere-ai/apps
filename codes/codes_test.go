@@ -3,7 +3,10 @@
 
 package codes
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // TestEveryCodeHasASentence: an entry with no sentence or no hint, a key
 // that differs from its name, or a status outside the error range is a bug
@@ -25,6 +28,20 @@ func TestEveryCodeHasASentence(t *testing.T) {
 		if c.Status < 400 || c.Status > 599 {
 			t.Errorf("%s: status %d is not an error status", key, c.Status)
 		}
+	}
+}
+
+// TestBuildTimeoutNamesNoFigure: a build is stopped by more than one
+// limit, each step's budget and the build's whole life, and the platform
+// that runs the build holds them, so the sentence states none and the
+// details name the one that was reached.
+func TestBuildTimeoutNamesNoFigure(t *testing.T) {
+	c, ok := Lookup("build_timeout")
+	if !ok {
+		t.Fatal("build_timeout is not in the registry")
+	}
+	if strings.ContainsAny(c.Message, "0123456789") {
+		t.Errorf("build_timeout states a figure: %q", c.Message)
 	}
 }
 

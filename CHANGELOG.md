@@ -10,6 +10,11 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+- `codes`: `build_timeout` says the build ran longer than its time limit.
+  It named 15 minutes, which no limit of the build is; the limits are the
+  platform's and the details name the one a build reached. No code, status
+  or hint changes.
+
 - `codes`: the hints of the codes an app's visitor and the API answer today
   name what works now (push a commit, push a `v` tag, the lists of deploys
   and releases) instead of `latere app` commands that do not exist yet.

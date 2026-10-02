@@ -126,7 +126,7 @@ var Codes = map[string]Code{
 		Message: "The platform could not tell how to run this app.",
 		Hint:    "Set `kind` and `service.start` in `latere-app.yaml`, or add a Dockerfile."},
 	"build_timeout": {Name: "build_timeout", Status: 422,
-		Message: "The build ran longer than 15 minutes and was stopped.",
+		Message: "The build ran longer than its time limit and was stopped.",
 		Hint:    "Make the build faster, or split the app into components."},
 	"build_unschedulable": {Name: "build_unschedulable", Status: 503,
 		Message: "The platform had no room to run this build.",
