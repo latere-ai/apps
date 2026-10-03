@@ -10,6 +10,11 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+- `codes`: `repository_name_taken`, 409. An app's repository lives under
+  its owner's name, beside the owner's other repositories, so an app whose
+  slug names a repository the owner already has is refused with it rather
+  than given another name.
+
 - `codes`: `build_timeout` says the build ran longer than its time limit.
   It named 15 minutes, which no limit of the build is; the limits are the
   platform's and the details name the one a build reached. No code, status
