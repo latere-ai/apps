@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.0.2 - 2026-10-04
+
 - `codes` and `manifest`: the manifest's reference and its schema are named
   at the addresses the docs serve them from, under `/docs/apps/`. The hint
   of `manifest_unknown_key` pointed at `platform.latere.ai/docs/app/manifest`
