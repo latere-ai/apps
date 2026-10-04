@@ -265,3 +265,17 @@ func typeMatches(t any, doc any) bool {
 	}
 	return false
 }
+
+// TestSchemaIsNamedWhereTheDocsServeIt holds the schema's $id to the address
+// the platform's docs publish these bytes at, beside the manifest reference.
+func TestSchemaIsNamedWhereTheDocsServeIt(t *testing.T) {
+	var doc struct {
+		ID string `json:"$id"`
+	}
+	if err := json.Unmarshal(Schema(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if want := "https://platform.latere.ai/docs/apps/latere-app.schema.json"; doc.ID != want {
+		t.Errorf("$id = %q, want %q", doc.ID, want)
+	}
+}

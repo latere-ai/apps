@@ -53,3 +53,29 @@ func TestLookup(t *testing.T) {
 		t.Fatal("an unknown code must not be found")
 	}
 }
+
+// TestHintsNameTheAppsDocs holds every docs address a hint gives a reader to
+// the section the platform serves, /docs/apps/. A hint once pointed at
+// /docs/app/, which has never answered.
+func TestHintsNameTheAppsDocs(t *testing.T) {
+	const docs = "platform.latere.ai/docs/"
+	for name, code := range Codes {
+		for _, text := range []string{code.Message, code.Hint} {
+			rest := text
+			for {
+				_, after, found := strings.Cut(rest, docs)
+				if !found {
+					break
+				}
+				if !strings.HasPrefix(after, "apps/") {
+					t.Errorf("%s names %s%s, outside /docs/apps/", name, docs, after)
+				}
+				rest = after
+			}
+		}
+	}
+	hint := Codes["manifest_unknown_key"].Hint
+	if !strings.Contains(hint, docs+"apps/manifest") {
+		t.Errorf("manifest_unknown_key's hint does not name the manifest reference: %q", hint)
+	}
+}

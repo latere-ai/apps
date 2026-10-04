@@ -10,6 +10,13 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+- `codes` and `manifest`: the manifest's reference and its schema are named
+  at the addresses the docs serve them from, under `/docs/apps/`. The hint
+  of `manifest_unknown_key` pointed at `platform.latere.ai/docs/app/manifest`
+  and the schema's `$id` at `/docs/app/latere-app.schema.json`; neither
+  address answers. They are `platform.latere.ai/docs/apps/manifest` and
+  `https://platform.latere.ai/docs/apps/latere-app.schema.json`.
+
 - `codes`: `repository_name_taken`, 409. An app's repository lives under
   its owner's name, beside the owner's other repositories, so an app whose
   slug names a repository the owner already has is refused with it rather

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://platform.latere.ai/docs/app/latere-app.schema.json",
+  "$id": "https://platform.latere.ai/docs/apps/latere-app.schema.json",
   "title": "latere-app.yaml",
   "description": "How Latere Apps builds and serves an app. Every key is optional.",
   "type": "object",

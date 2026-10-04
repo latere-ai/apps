@@ -189,7 +189,7 @@ var Codes = map[string]Code{
 	// The manifest and deploy creation.
 	"manifest_unknown_key": {Name: "manifest_unknown_key", Status: 400,
 		Message: "`latere-app.yaml` has a key the platform does not know.",
-		Hint:    "Check the key against the reference at platform.latere.ai/docs/app/manifest."},
+		Hint:    "Check the key against the reference at platform.latere.ai/docs/apps/manifest."},
 	"manifest_shape_conflict": {Name: "manifest_shape_conflict", Status: 400,
 		Message: "`latere-app.yaml` mixes `components:` with the single-component keys.",
 		Hint:    "Keep either `components:` or the top-level `kind`, `static`, and `service` keys."},
