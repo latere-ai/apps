@@ -8,13 +8,13 @@ tool latere.ai/x/ci-gate/cmd/lateregate
 
 require (
 	github.com/goccy/go-yaml v1.19.2
-	latere.ai/x/pkg v0.90.2
+	latere.ai/x/pkg v0.110.2
 )
 
 require (
 	github.com/google/uuid v1.6.0 // indirect
-	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/tools v0.51.0 // indirect
-	latere.ai/x/ci-gate v0.59.1 // indirect
+	golang.org/x/mod v0.42.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/tools v0.52.0 // indirect
+	latere.ai/x/ci-gate v0.60.0 // indirect
 )
