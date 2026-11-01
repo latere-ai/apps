@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.0.3 - 2026-11-01
+
 ### Added
 
 - **`app_quota_exceeded`,** a 429 for an account at its number of apps. The
