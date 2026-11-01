@@ -10,6 +10,16 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Added
+
+- **`app_quota_exceeded`,** a 429 for an account at its number of apps. The
+  details carry `limit`, `value` and `max`.
+
+### Changed
+
+- The refusals of too many components, links or data services no longer
+  mention a plan or suggest moving to one. No plan changes these limits.
+
 ### Security
 
 - Built with Go 1.27.2, which fixes GO-2026-6611, GO-2026-6612, GO-2026-6613 and GO-2026-6617.
