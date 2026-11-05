@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.0.4 - 2026-11-05
+
 ### Changed
 
 - **`manifest` and `authorizer` use `encoding/json/v2`.** Manifests and
