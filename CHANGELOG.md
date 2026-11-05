@@ -10,6 +10,15 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Changed
+
+- **`manifest` and `authorizer` use `encoding/json/v2`.** Manifests and
+  limits encode to the same bytes as before, under either JSON package, so a
+  consumer that writes these types gets the omission rules this package
+  documents. Manifest files are read as leniently as before: duplicate keys,
+  invalid UTF-8 and any letter case in names are accepted.
+- Requires `latere.ai/x/pkg` v0.113.0.
+
 ## v0.0.3 - 2026-11-01
 
 ### Added
