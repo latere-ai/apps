@@ -55,11 +55,11 @@ type ResolvedComponent struct {
 	Kind        string            `json:"kind"`
 	Path        string            `json:"path"`
 	Route       string            `json:"route"`
-	StripPrefix bool              `json:"strip_prefix,omitempty"`
-	Static      *Static           `json:"static,omitempty"`
-	Service     *Service          `json:"service,omitempty"`
+	StripPrefix bool              `json:"strip_prefix,omitzero"`
+	Static      *Static           `json:"static,omitzero"`
+	Service     *Service          `json:"service,omitzero"`
 	Env         map[string]string `json:"env,omitempty"`
-	Detected    *Detection        `json:"detected,omitempty"`
+	Detected    *Detection        `json:"detected,omitzero"`
 }
 
 var (

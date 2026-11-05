@@ -30,11 +30,11 @@ const (
 type Manifest struct {
 	Name       string                `yaml:"name" json:"name,omitempty"`
 	Kind       string                `yaml:"kind" json:"kind,omitempty"`
-	Static     *Static               `yaml:"static" json:"static,omitempty"`
-	Service    *Service              `yaml:"service" json:"service,omitempty"`
+	Static     *Static               `yaml:"static" json:"static,omitzero"`
+	Service    *Service              `yaml:"service" json:"service,omitzero"`
 	Components map[string]*Component `yaml:"components" json:"components,omitempty"`
 	Links      []string              `yaml:"links" json:"links,omitempty"`
-	Build      *Build                `yaml:"build" json:"build,omitempty"`
+	Build      *Build                `yaml:"build" json:"build,omitzero"`
 	Env        map[string]string     `yaml:"env" json:"env,omitempty"`
 	Resources  map[string]*Resource  `yaml:"resources" json:"resources,omitempty"`
 
@@ -45,30 +45,30 @@ type Manifest struct {
 // Static is the static block: how a static component is built and served.
 type Static struct {
 	// Build is the build command; nil means detected, "" no build.
-	Build *string `yaml:"build" json:"build,omitempty"`
+	Build *string `yaml:"build" json:"build,omitzero"`
 	// Dir is the directory published, relative to the component's root.
 	Dir string `yaml:"dir" json:"dir,omitempty"`
 	// SPA serves index.html for unknown paths; nil means true when the
 	// output has an index.html.
-	SPA *bool `yaml:"spa" json:"spa,omitempty"`
+	SPA *bool `yaml:"spa" json:"spa,omitzero"`
 	// Headers are extra response headers by path glob, each rule a path
 	// and the headers set on it.
 	Headers []map[string]string `yaml:"headers" json:"headers,omitempty"`
 	// Sitemap generates /sitemap.xml from the component's HTML paths.
-	Sitemap bool `yaml:"sitemap" json:"sitemap,omitempty"`
+	Sitemap bool `yaml:"sitemap" json:"sitemap,omitzero"`
 }
 
 // Service is the service block: how a service component is built and run.
 type Service struct {
 	Builder              string      `yaml:"builder" json:"builder,omitempty"`
 	Start                string      `yaml:"start" json:"start,omitempty"`
-	Port                 *int        `yaml:"port" json:"port,omitempty"`
+	Port                 *int        `yaml:"port" json:"port,omitzero"`
 	Health               string      `yaml:"health" json:"health,omitempty"`
-	Resources            *Resources  `yaml:"resources" json:"resources,omitempty"`
-	Replicas             *Replicas   `yaml:"replicas" json:"replicas,omitempty"`
+	Resources            *Resources  `yaml:"resources" json:"resources,omitzero"`
+	Replicas             *Replicas   `yaml:"replicas" json:"replicas,omitzero"`
 	PublicPaths          []string    `yaml:"public_paths" json:"public_paths,omitempty"`
-	ForwardAuthorization bool        `yaml:"forward_authorization" json:"forward_authorization,omitempty"`
-	Dockerfile           *Dockerfile `yaml:"dockerfile" json:"dockerfile,omitempty"`
+	ForwardAuthorization bool        `yaml:"forward_authorization" json:"forward_authorization,omitzero"`
+	Dockerfile           *Dockerfile `yaml:"dockerfile" json:"dockerfile,omitzero"`
 	Migrate              string      `yaml:"migrate" json:"migrate,omitempty"`
 }
 
@@ -96,9 +96,9 @@ type Component struct {
 	Kind        string            `yaml:"kind" json:"kind,omitempty"`
 	Path        string            `yaml:"path" json:"path,omitempty"`
 	Route       string            `yaml:"route" json:"route,omitempty"`
-	StripPrefix bool              `yaml:"strip_prefix" json:"strip_prefix,omitempty"`
-	Static      *Static           `yaml:"static" json:"static,omitempty"`
-	Service     *Service          `yaml:"service" json:"service,omitempty"`
+	StripPrefix bool              `yaml:"strip_prefix" json:"strip_prefix,omitzero"`
+	Static      *Static           `yaml:"static" json:"static,omitzero"`
+	Service     *Service          `yaml:"service" json:"service,omitzero"`
 	Env         map[string]string `yaml:"env" json:"env,omitempty"`
 	Schedule    string            `yaml:"schedule" json:"schedule,omitempty"`
 	Start       string            `yaml:"start" json:"start,omitempty"`

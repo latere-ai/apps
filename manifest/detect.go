@@ -5,7 +5,8 @@ package manifest
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"maps"
 	"path"
 	"slices"
@@ -33,8 +34,16 @@ type Detection struct {
 	Evidence string  `json:"evidence"`
 	Kind     string  `json:"kind"`
 	Dir      string  `json:"dir,omitempty"`
-	Build    *string `json:"build,omitempty"`
+	Build    *string `json:"build,omitzero"`
 }
+
+// foreignJSON reads files the repository's author wrote: duplicate keys, invalid
+// UTF-8 and any letter case are accepted, as the encoding/json decoder did.
+var foreignJSON = json.JoinOptions(
+	jsontext.AllowDuplicateNames(true),
+	jsontext.AllowInvalidUTF8(true),
+	json.MatchCaseInsensitiveNames(true),
+)
 
 type packageJSON struct {
 	Scripts         map[string]string `json:"scripts"`
@@ -101,7 +110,7 @@ func Detect(t Tree, root string) (*Detection, error) {
 	}
 	if here["package.json"] {
 		var pkg packageJSON
-		if err := json.Unmarshal(read("package.json"), &pkg); err != nil {
+		if err := json.Unmarshal(read("package.json"), &pkg, foreignJSON); err != nil {
 			pkg = packageJSON{}
 		}
 		build := "npm run build"
