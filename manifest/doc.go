@@ -6,10 +6,12 @@
 // reads the file and refuses a key the platform does not know, Detect
 // tells a static site from a service when the file names no kind, Resolve
 // applies the defaults and every rule to one tree, and Schema is the same
-// grammar as a JSON Schema for editors and for the CLI's offline check.
+// grammar as a JSON Schema for editors and for a client's offline check.
 //
-// The server, the CLI and an agent's skill import this one package, so a
-// manifest the CLI accepts offline is one the server accepts, and an
-// error names the same code, key and line on both sides. Every Code here
-// is a code of package codes.
+// The Latere Apps server parses and resolves every manifest with this
+// package, so a client that imports it refuses a manifest offline with the
+// same code, key and line the server answers with. The server adds checks
+// of its own, such as the names build.env may not use, so a manifest
+// accepted offline can still be refused. Every Code here is a code of
+// package codes.
 package manifest

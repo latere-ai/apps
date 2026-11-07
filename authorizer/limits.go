@@ -14,11 +14,13 @@ import (
 // WireLimits is the limits object an allow carries, exported so an
 // authorizer renders its answer through the type the server decodes rather
 // than through string literals. Every member is optional: a member the
-// object does not name stays nil and omitempty leaves it out, and the server
+// object does not name stays nil and omitzero leaves it out, and the server
 // takes its own default for it. A count is an integer, a switch a boolean,
 // and a size or a CPU figure a Kubernetes quantity string such as "1Gi" or
 // "1000m". Each member is carried on the action whose effect it bounds,
-// named in its comment.
+// named in its comment. Encoding does not check values: a negative count or
+// an empty quantity renders, and DecodeLimits refuses it, so an authorizer
+// sets counts of zero or more and quantities that are not empty.
 type WireLimits struct {
 	// AppsMax is the tenant's number of apps, on app.create.
 	AppsMax *int64 `json:"apps_max,omitzero"`
