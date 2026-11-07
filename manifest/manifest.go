@@ -4,6 +4,7 @@
 package manifest
 
 import (
+	"bytes"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,6 +16,25 @@ import (
 
 // FileName is the manifest's name at the root of an app's tree.
 const FileName = "latere-app.yaml"
+
+// MaxFileBytes is the most of latere-app.yaml that Parse reads; a longer
+// file is refused as CodeTooLarge before anything parses it. The YAML
+// parser's cost grows faster than its input, so the bound is what keeps a
+// hostile file cheap.
+const MaxFileBytes = 64 << 10
+
+// maxDepth is the deepest nesting Parse accepts, counted as open flow
+// brackets plus a run of block indicators. The grammar needs about seven
+// levels. The parser's memory is quadratic in flow nesting, so the depth
+// is bounded by a scan of the bytes before parsing.
+const maxDepth = 32
+
+// maxKeyLines is the most lines holding a key that Parse accepts; more is
+// CodeTooLarge. The parser's cost grows with the square of the keys in one
+// mapping, so the count is bounded before parsing. Real manifests hold a
+// few dozen, and one at the default limits with a hundred variables in
+// each env block holds about 500.
+const maxKeyLines = 1000
 
 // The component kinds. Worker and cron parse and are refused until they
 // are built.
@@ -124,10 +144,13 @@ type grammar struct {
 	each *grammar
 	open bool
 	list *grammar
+	// integer marks a scalar that must be a YAML integer.
+	integer bool
 }
 
 var (
 	scalar  = &grammar{}
+	integer = &grammar{integer: true}
 	openMap = &grammar{open: true}
 
 	staticGrammar = &grammar{keys: map[string]*grammar{
@@ -135,9 +158,9 @@ var (
 		"headers": {list: openMap},
 	}}
 	serviceGrammar = &grammar{keys: map[string]*grammar{
-		"builder": scalar, "start": scalar, "port": scalar, "health": scalar,
+		"builder": scalar, "start": scalar, "port": integer, "health": scalar,
 		"resources":             {keys: map[string]*grammar{"memory": scalar, "cpu": scalar}},
-		"replicas":              {keys: map[string]*grammar{"min": scalar, "max": scalar}},
+		"replicas":              {keys: map[string]*grammar{"min": integer, "max": integer}},
 		"public_paths":          {list: scalar},
 		"forward_authorization": scalar,
 		"dockerfile":            {keys: map[string]*grammar{"path": scalar, "target": scalar}},
@@ -162,25 +185,55 @@ var (
 )
 
 // Parse reads a latere-app.yaml. An empty file is the empty manifest. A
-// key the grammar does not have is CodeUnknownKey with its dotted path
-// and line; components beside the single-component keys is
-// CodeShapeConflict; a file that is not YAML or a value of the wrong type
-// is CodeInvalid.
+// file longer than MaxFileBytes, or with more than maxKeyLines lines
+// holding a key, is CodeTooLarge. A leading UTF-8 byte
+// order mark is ignored. A key the grammar does not have is
+// CodeUnknownKey with its dotted path and line; components beside the
+// single-component keys is CodeShapeConflict. These are CodeInvalid, each
+// with its reason and line where it has one: a file that is not YAML
+// (ReasonSyntax); a value of the wrong type, including a port or replica
+// bound that is not an integer (ReasonType); more than one document
+// (ReasonDocuments); an anchor or an alias (ReasonAnchor), which could
+// hide a key from the check or multiply the file's size; a tag
+// (ReasonTag), which changes how a value reads; nesting deeper than
+// maxDepth (ReasonDepth). Depth and key lines are counted over the raw
+// bytes before parsing, quotes and
+// comments ignored, so a file with more than maxDepth open brackets is
+// refused even when they sit inside a quoted value.
 func Parse(data []byte) (*Manifest, error) {
+	if len(data) > MaxFileBytes {
+		return nil, fail(CodeTooLarge, "limit", "bytes", "value", len(data), "max", MaxFileBytes)
+	}
+	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
+	if err := checkShape(data); err != nil {
+		return nil, err
+	}
 	m := &Manifest{lines: map[string]int{}}
 	file, err := parser.ParseBytes(data, 0)
 	if err != nil {
 		return nil, syntaxError(err)
 	}
+	var body ast.Node
 	for _, doc := range file.Docs {
 		if doc == nil || doc.Body == nil {
 			continue
 		}
-		if err := m.walk(doc.Body, rootGrammar, ""); err != nil {
-			return nil, err
+		if body != nil {
+			return nil, fail(CodeInvalid, "reason", ReasonDocuments, "line", lineOf(doc.Body))
 		}
+		body = doc.Body
 	}
-	if err := yaml.Unmarshal(data, m); err != nil {
+	if body == nil {
+		return m, nil
+	}
+	// Before any decoding: the decoder expands aliases and applies tags.
+	if err := refuseIndirection(body); err != nil {
+		return nil, err
+	}
+	if err := m.walk(body, rootGrammar, ""); err != nil {
+		return nil, err
+	}
+	if err := yaml.NodeToValue(body, m); err != nil {
 		return nil, typeError(err)
 	}
 	if len(m.Components) > 0 {
@@ -197,10 +250,116 @@ func Parse(data []byte) (*Manifest, error) {
 	return m, nil
 }
 
+// checkShape refuses data nested deeper than maxDepth or holding more
+// than maxKeyLines lines with a key. It over-counts on purpose. Depth is
+// every open bracket minus every close (never below zero), plus the run of
+// "- " and "? " indicators that starts at the token being read; block
+// nesting by indentation is not counted, MaxFileBytes bounds it. A key
+// line is one with a colon followed by a space or the end of the line.
+func checkShape(data []byte) error {
+	depth, line, keyLines, keyed := 0, 1, 0, false
+	tooMany := func() error {
+		return fail(CodeTooLarge, "limit", "keys", "max", maxKeyLines, "line", line)
+	}
+	for i := 0; i < len(data); i++ {
+		switch c := data[i]; c {
+		case ':':
+			keyed = keyed || i+1 == len(data) || strings.ContainsRune(" \t\r\n", rune(data[i+1]))
+		case '\n':
+			if keyed {
+				keyLines++
+				keyed = false
+				if keyLines > maxKeyLines {
+					return tooMany()
+				}
+			}
+			line++
+		case '[', '{':
+			depth++
+			if depth > maxDepth {
+				return fail(CodeInvalid, "reason", ReasonDepth, "line", line, "max", maxDepth)
+			}
+		case ']', '}':
+			if depth > 0 {
+				depth--
+			}
+		case '-', '?':
+			if i > 0 && !strings.ContainsRune(" \t\r\n[{,", rune(data[i-1])) {
+				continue
+			}
+			run, j := 0, i
+			for j < len(data) && (data[j] == '-' || data[j] == '?') && (j+1 == len(data) || strings.ContainsRune(" \t\r\n", rune(data[j+1]))) {
+				run++
+				j++
+				for j < len(data) && (data[j] == ' ' || data[j] == '\t') {
+					j++
+				}
+			}
+			if depth+run > maxDepth {
+				return fail(CodeInvalid, "reason", ReasonDepth, "line", line, "max", maxDepth)
+			}
+			if run > 0 {
+				i = j - 1
+			}
+		}
+	}
+	if keyed && keyLines+1 > maxKeyLines {
+		return tooMany()
+	}
+	return nil
+}
+
+// indirection finds the first anchor, alias or tag of a document.
+type indirection struct{ err *Error }
+
+func (v *indirection) Visit(n ast.Node) ast.Visitor {
+	if v.err != nil || n == nil {
+		return nil
+	}
+	switch n.(type) {
+	case *ast.AnchorNode, *ast.AliasNode:
+		v.err = fail(CodeInvalid, "reason", ReasonAnchor, "line", lineOf(n))
+		return nil
+	case *ast.TagNode:
+		v.err = fail(CodeInvalid, "reason", ReasonTag, "line", lineOf(n))
+		return nil
+	}
+	return v
+}
+
+// refuseIndirection refuses an anchor, an alias or a tag anywhere in node.
+func refuseIndirection(node ast.Node) error {
+	v := &indirection{}
+	ast.Walk(v, node)
+	if v.err != nil {
+		return v.err
+	}
+	return nil
+}
+
+// lineOf is the line a node starts on, or 0 when it has no token.
+func lineOf(n ast.Node) int {
+	if tk := n.GetToken(); tk != nil && tk.Position != nil {
+		return tk.Position.Line
+	}
+	return 0
+}
+
+// keyName is the key as written without its quotes.
+func keyName(k ast.Node) string {
+	switch n := k.(type) {
+	case *ast.StringNode:
+		return n.Value
+	case *ast.MappingKeyNode:
+		return keyName(n.Value)
+	}
+	return k.String()
+}
+
 // walk checks node against g, recording the line of every key it meets.
 func (m *Manifest) walk(node ast.Node, g *grammar, path string) error {
 	switch {
-	case node == nil, g == scalar, g.open:
+	case node == nil, g.integer, g == scalar, g.open:
 		return nil
 	case g.list != nil:
 		seq, ok := node.(*ast.SequenceNode)
@@ -215,18 +374,25 @@ func (m *Manifest) walk(node ast.Node, g *grammar, path string) error {
 		return nil
 	}
 	for _, mv := range mappingValues(node) {
-		key := mv.Key.String()
+		key := keyName(mv.Key)
 		full := key
 		if path != "" {
 			full = path + "." + key
 		}
-		line := mv.Key.GetToken().Position.Line
+		line := lineOf(mv.Key)
 		m.lines[full] = line
 		next := g.each
 		if next == nil {
 			var ok bool
 			if next, ok = g.keys[key]; !ok {
 				return fail(CodeUnknownKey, "key", full, "line", line)
+			}
+		}
+		if next.integer {
+			switch mv.Value.(type) {
+			case *ast.IntegerNode, *ast.NullNode:
+			default:
+				return fail(CodeInvalid, "key", full, "reason", ReasonType, "line", line)
 			}
 		}
 		if err := m.walk(mv.Value, next, full); err != nil {

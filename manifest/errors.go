@@ -16,6 +16,7 @@ const (
 	CodeUnknownKey          = "manifest_unknown_key"
 	CodeShapeConflict       = "manifest_shape_conflict"
 	CodeInvalid             = "manifest_invalid"
+	CodeTooLarge            = "manifest_too_large"
 	CodeUnknownReference    = "manifest_unknown_reference"
 	CodeKindUnsupported     = "component_kind_unsupported"
 	CodePathMissing         = "component_path_missing"
@@ -32,7 +33,7 @@ const (
 )
 
 // The reasons of CodeInvalid. The first group is the reference's; the
-// last four name refusals the reference states as rules without a
+// rest name refusals the reference states as rules without a
 // reason of their own.
 const (
 	ReasonNameMismatch         = "name_mismatch"
@@ -56,6 +57,14 @@ const (
 	// ReasonValue: a value outside a key's closed set or form: a kind, a
 	// component or resource name, a path, a route, a header rule.
 	ReasonValue = "value"
+	// ReasonDepth: the file nests deeper than the grammar needs.
+	ReasonDepth = "depth"
+	// ReasonDocuments: the file holds more than one YAML document.
+	ReasonDocuments = "documents"
+	// ReasonAnchor: the file uses an anchor or an alias.
+	ReasonAnchor = "anchor"
+	// ReasonTag: the file tags a value, such as !!binary.
+	ReasonTag = "tag"
 	// ReasonKindKeys: a component carries the keys of the other kind, such
 	// as a static component with a service block.
 	ReasonKindKeys = "kind_keys"

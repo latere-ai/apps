@@ -85,7 +85,7 @@ func TestComponentsValidation(t *testing.T) {
 
 	// Every code a manifest is refused with is an entry of the registry,
 	// so the API and the CLI render the same sentence for it.
-	for _, code := range []string{CodeUnknownKey, CodeShapeConflict, CodeInvalid, CodeUnknownReference, CodeKindUnsupported,
+	for _, code := range []string{CodeUnknownKey, CodeShapeConflict, CodeInvalid, CodeTooLarge, CodeUnknownReference, CodeKindUnsupported,
 		CodePathMissing, CodeRouteConflict, CodeRootMissing, CodeRootConflict, CodeLinkSelf, CodeKindUndetectable,
 		CodeDockerfile, CodeReplicasUnsupported, CodeComponentQuota, CodeLinkQuota, CodeResourceQuota} {
 		if _, ok := codes.Lookup(code); !ok {
