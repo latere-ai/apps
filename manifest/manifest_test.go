@@ -163,7 +163,8 @@ func TestDefaults(t *testing.T) {
 
 func TestQuantities(t *testing.T) {
 	for q, want := range map[string]float64{"128Mi": 128 << 20, "1Gi": 1 << 30, "512Ki": 512 << 10, "1k": 1e3,
-		"2M": 2e6, "1G": 1e9, "1T": 1e12, "1Ti": 1 << 40, "1000": 1000, "0.5Gi": 1 << 29} {
+		"2M": 2e6, "1G": 1e9, "1T": 1e12, "1Ti": 1 << 40, "1000": 1000, "0.5Gi": 1 << 29,
+		"1e3": 1e3, "1Pi": 1 << 50, "1E": 1e18} {
 		if got, ok := memoryBytes(q); !ok || got != want {
 			t.Errorf("memoryBytes(%q) = %v, %v", q, got, ok)
 		}
@@ -173,7 +174,7 @@ func TestQuantities(t *testing.T) {
 			t.Errorf("cpuMillis(%q) = %v, %v", q, got, ok)
 		}
 	}
-	for _, q := range []string{"", "Mi", "-1Gi", "1e3", "lots"} {
+	for _, q := range []string{"", "Mi", "-1Gi", "1e", "0x1p30", "1_024Mi", "lots"} {
 		if _, ok := memoryBytes(q); ok {
 			t.Errorf("memoryBytes(%q) read", q)
 		}

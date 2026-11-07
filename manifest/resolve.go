@@ -11,11 +11,16 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Limits are the figures a manifest is checked against, which the
 // platform's answer to deploy.create carries; DefaultLimits are a
-// self-hosted installation's.
+// self-hosted installation's. The three quantities are Kubernetes
+// quantities such as "1Gi" or "500m"; Resolve refuses a Limits whose
+// quantity does not read, so a ceiling that cannot be read is never
+// taken for no ceiling.
 type Limits struct {
 	ComponentsMax   int
 	LinksMax        int
@@ -26,7 +31,7 @@ type Limits struct {
 }
 
 // DefaultLimits are the figures a manifest is checked against when the
-// platform names none.
+// platform names none, and the figures Resolve uses for the zero Limits.
 func DefaultLimits() Limits {
 	return Limits{ComponentsMax: 3, LinksMax: 10, ResourcesMax: 3, MemoryMax: "1Gi", CPUMax: "1000m", PostgresSizeMax: "10Gi"}
 }
@@ -35,7 +40,9 @@ func DefaultLimits() Limits {
 type Options struct {
 	// Slug is the app's slug, which name must equal when set.
 	Slug string
-	// Limits are the figures the manifest is checked against.
+	// Limits are the figures the manifest is checked against. The zero
+	// Limits mean DefaultLimits; any other value is used as given, and
+	// each of its quantities must be a readable Kubernetes quantity.
 	Limits Limits
 }
 
@@ -63,8 +70,16 @@ type ResolvedComponent struct {
 }
 
 var (
-	namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,19}$`)
-	reference   = regexp.MustCompile(`\$\{\{\s*([^}]*?)\s*\}\}`)
+	// namePattern is a component or resource name: it becomes a DNS
+	// label, so no trailing or double hyphen.
+	namePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
+	// slugPattern is an app slug, as the name and each link are.
+	slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	// tokenPattern is an RFC 9110 token, the form of a header name.
+	tokenPattern = regexp.MustCompile("^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
+	// routeChars are the characters a route or a public path may hold.
+	routeChars = regexp.MustCompile(`^[A-Za-z0-9._~/-]*$`)
+	reference  = regexp.MustCompile(`\$\{\{\s*([^}]*?)\s*\}\}`)
 )
 
 // reservedHeaders are the response headers a static header rule may not
@@ -72,6 +87,8 @@ var (
 var reservedHeaders = []string{"content-length", "content-encoding", "set-cookie"}
 
 const (
+	maxNameLen     = 20
+	maxSlugLen     = 40
 	maxHeaderRules = 20
 	maxPublicPaths = 10
 	maxMigrate     = 1000
@@ -85,10 +102,26 @@ const (
 // detecting it when the manifest names none, fills the defaults, and
 // checks every rule of the grammar. The first rule broken is the error,
 // an *Error with the code of package codes. A nil m is the empty
-// manifest.
+// manifest. An unreadable quantity in opts.Limits is the caller's
+// mistake, not the manifest's, and is a plain error.
 func Resolve(m *Manifest, t Tree, opts Options) (*Resolved, error) {
 	if m == nil {
 		m = &Manifest{}
+	}
+	if opts.Limits == (Limits{}) {
+		opts.Limits = DefaultLimits()
+	}
+	for _, q := range []struct{ name, value string }{
+		{"MemoryMax", opts.Limits.MemoryMax},
+		{"CPUMax", opts.Limits.CPUMax},
+		{"PostgresSizeMax", opts.Limits.PostgresSizeMax},
+	} {
+		if _, ok := quantity(q.value); !ok {
+			return nil, fmt.Errorf("manifest: Options.Limits.%s %q is not a quantity", q.name, q.value)
+		}
+	}
+	if m.Name != "" && !isSlug(m.Name) {
+		return nil, m.invalid("name", ReasonValue)
 	}
 	if m.Name != "" && opts.Slug != "" && m.Name != opts.Slug {
 		return nil, m.invalid("name", ReasonNameMismatch)
@@ -112,7 +145,7 @@ func Resolve(m *Manifest, t Tree, opts Options) (*Resolved, error) {
 		}
 		out.Components = append(out.Components, *rc)
 	}
-	if err := checkRoutes(out.Components); err != nil {
+	if err := m.checkRoutes(out.Components); err != nil {
 		return nil, err
 	}
 	if err := m.checkLinks(opts); err != nil {
@@ -143,7 +176,7 @@ func (m *Manifest) components() ([]named, error) {
 	var out []named
 	for _, name := range slices.Sorted(maps.Keys(m.Components)) {
 		key := "components." + name
-		if !namePattern.MatchString(name) || strings.Contains(name, "--") {
+		if !isName(name) {
 			return nil, m.invalid(key, ReasonValue)
 		}
 		c := m.Components[name]
@@ -162,7 +195,7 @@ func (m *Manifest) resolveComponent(n named, t Tree, files []string, l Limits) (
 	if p == "" {
 		p = "."
 	}
-	if path.IsAbs(p) || strings.HasPrefix(path.Clean(p), "..") {
+	if escapes(p) {
 		return nil, m.invalid(n.key+"path", ReasonValue)
 	}
 	rc.Path = path.Clean(p)
@@ -227,7 +260,7 @@ func (m *Manifest) resolveStatic(key string, s *Static, d *Detection) (*Static, 
 	if out.Dir == "" {
 		out.Dir = "."
 	}
-	if path.IsAbs(out.Dir) || strings.HasPrefix(path.Clean(out.Dir), "..") {
+	if escapes(out.Dir) {
 		return nil, m.invalid(key+"dir", ReasonDirEscapes)
 	}
 	out.Dir = path.Clean(out.Dir)
@@ -238,6 +271,11 @@ func (m *Manifest) resolveStatic(key string, s *Static, d *Detection) (*Static, 
 		k := fmt.Sprintf("%sheaders[%d]", key, i)
 		if !strings.HasPrefix(rule["path"], "/") || len(rule) < 2 {
 			return nil, m.invalid(k, ReasonValue)
+		}
+		for h, v := range rule {
+			if (h != "path" && !tokenPattern.MatchString(h)) || strings.ContainsFunc(v, isBadValueChar) {
+				return nil, m.invalid(k, ReasonValue)
+			}
 		}
 		for h := range rule {
 			lh := strings.ToLower(h)
@@ -263,6 +301,9 @@ func (m *Manifest) resolveService(n named, s *Service, files []string, root stri
 		if df == "" {
 			df = "Dockerfile"
 		}
+		if escapes(df) {
+			return nil, m.invalid(key+"dockerfile.path", ReasonValue)
+		}
 		if !slices.Contains(files, path.Join(root, df)) {
 			return nil, m.invalid(key+"dockerfile.path", ReasonDockerfileMissing)
 		}
@@ -283,7 +324,7 @@ func (m *Manifest) resolveService(n named, s *Service, files []string, root stri
 	}
 	if out.Health == "" {
 		out.Health = "/"
-	} else if !strings.HasPrefix(out.Health, "/") {
+	} else if !validHealth(out.Health) {
 		return nil, m.invalid(key+"health", ReasonValue)
 	}
 	r := Resources{Memory: "256Mi", CPU: "250m"}
@@ -311,31 +352,62 @@ func (m *Manifest) resolveService(n named, s *Service, files []string, root stri
 		return nil, m.invalid(key+"public_paths", ReasonPublicPathsTooMany)
 	}
 	for _, p := range out.PublicPaths {
-		if !strings.HasPrefix(p, "/") || strings.Contains(strings.TrimSuffix(p, "*"), "*") {
+		if !strings.HasPrefix(p, "/") || !routeChars.MatchString(strings.TrimSuffix(p, "*")) {
 			return nil, m.invalid(key+"public_paths", ReasonValue)
 		}
 	}
-	if len(out.Migrate) > maxMigrate {
+	if utf8.RuneCountInString(out.Migrate) > maxMigrate {
 		return nil, m.invalid(key+"migrate", ReasonMigrateLength)
 	}
 	return out, nil
 }
 
-// within reports whether q reads as a quantity between lo and hi.
+// isName reports whether s is a valid component or resource name.
+func isName(s string) bool {
+	return len(s) <= maxNameLen && namePattern.MatchString(s)
+}
+
+// isSlug reports whether s is a valid app slug.
+func isSlug(s string) bool {
+	return len(s) <= maxSlugLen && slugPattern.MatchString(s)
+}
+
+// escapes reports whether p is absolute or, once cleaned, leaves the
+// tree. A directory named "..foo" is inside.
+func escapes(p string) bool {
+	c := path.Clean(p)
+	return path.IsAbs(p) || c == ".." || strings.HasPrefix(c, "../")
+}
+
+// isBadValueChar reports whether r is a control character a header
+// value may not hold; horizontal tab is allowed.
+func isBadValueChar(r rune) bool {
+	return r != '\t' && (r < 0x20 || r == 0x7f)
+}
+
+// validHealth reports whether h is a path on the service itself: it
+// starts with one slash and holds no whitespace or control character.
+func validHealth(h string) bool {
+	return strings.HasPrefix(h, "/") && !strings.HasPrefix(h, "//") &&
+		!strings.ContainsFunc(h, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) })
+}
+
+// within reports whether q reads as a quantity between lo and hi. An
+// unreadable ceiling fails, never passes.
 func within(read func(string) (float64, bool), q, lo, hi string) bool {
 	v, ok := read(q)
 	floor, _ := read(lo)
 	ceil, okCeil := read(hi)
-	return ok && v >= floor && (!okCeil || v <= ceil)
+	return ok && okCeil && v >= floor && v <= ceil
 }
 
-func checkRoutes(comps []ResolvedComponent) error {
+func (m *Manifest) checkRoutes(comps []ResolvedComponent) error {
 	owners := map[string][]string{}
 	var roots []string
 	for _, c := range comps {
 		r := c.Route
-		if r == "" || r != "/" && (path.Clean(r) != r || !strings.HasPrefix(r, "/")) {
-			return fail(CodeInvalid, "key", "components."+c.Name+".route", "reason", ReasonValue)
+		if r == "" || !strings.HasPrefix(r, "/") || path.Clean(r) != r || !routeChars.MatchString(r) {
+			return m.invalid("components."+c.Name+".route", ReasonValue)
 		}
 		owners[r] = append(owners[r], c.Name)
 		if r == "/" {
@@ -364,7 +436,12 @@ func (m *Manifest) checkLinks(opts Options) error {
 	if len(m.Links) > opts.Limits.LinksMax {
 		return fail(CodeLinkQuota, "limit", "links_max", "value", len(m.Links), "max", opts.Limits.LinksMax)
 	}
+	seen := map[string]bool{}
 	for _, s := range m.Links {
+		if !isSlug(s) || seen[s] {
+			return m.invalid("links", ReasonValue)
+		}
+		seen[s] = true
 		if opts.Slug != "" && s == opts.Slug {
 			return fail(CodeLinkSelf, "slug", s)
 		}
@@ -379,7 +456,7 @@ func (m *Manifest) checkResources(l Limits) error {
 	for _, name := range slices.Sorted(maps.Keys(m.Resources)) {
 		key := "resources." + name
 		r := m.Resources[name]
-		if !namePattern.MatchString(name) {
+		if !isName(name) {
 			return m.invalid(key, ReasonValue)
 		}
 		if r == nil || (r.Type != "postgres" && r.Type != "cache") {
