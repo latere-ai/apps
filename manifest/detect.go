@@ -18,11 +18,14 @@ import (
 type Tree interface {
 	// Files lists every file of the tree.
 	Files() []string
-	// ReadFile reads one file; detection reads at most MaxDetectRead of it.
+	// ReadFile reads one file. It may return only the first MaxDetectRead
+	// bytes: detection uses no more than that, so a Tree need not return
+	// the rest.
 	ReadFile(name string) ([]byte, error)
 }
 
-// MaxDetectRead is the most of one file detection reads.
+// MaxDetectRead is the most of one file detection uses. A file longer than
+// this is cut to it.
 const MaxDetectRead = 64 << 10
 
 // Detection is what detection found for one component: the rule that
@@ -51,6 +54,53 @@ type packageJSON struct {
 	DevDependencies map[string]string `json:"devDependencies"`
 }
 
+// readPackageJSON reads the members of a package.json that detection uses
+// from src, the first MaxDetectRead bytes of the file. It reads the top-level
+// object member by member and keeps every one of scripts, dependencies and
+// devDependencies read in full, so a file cut inside a large member still
+// yields the members before it. A member cut in the middle, or of the wrong
+// type, ends the read and is dropped whole: a half-read scripts object could
+// hold a start script but miss the build script that makes the app static.
+// Input that is not a JSON object yields the zero value.
+func readPackageJSON(src []byte) packageJSON {
+	var pkg packageJSON
+	dec := jsontext.NewDecoder(bytes.NewReader(src), foreignJSON)
+	if tok, err := dec.ReadToken(); err != nil || tok.Kind() != '{' {
+		return pkg
+	}
+	for dec.PeekKind() == '"' {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			break
+		}
+		var into *map[string]string
+		switch name := tok.String(); {
+		case strings.EqualFold(name, "scripts"):
+			into = &pkg.Scripts
+		case strings.EqualFold(name, "dependencies"):
+			into = &pkg.Dependencies
+		case strings.EqualFold(name, "devDependencies"):
+			into = &pkg.DevDependencies
+		default:
+			if err := dec.SkipValue(); err != nil {
+				return pkg
+			}
+			continue
+		}
+		var m map[string]string
+		if err := json.UnmarshalDecode(dec, &m, foreignJSON); err != nil {
+			// A cut member fails to decode, and nothing after it was read.
+			return pkg
+		}
+		if *into == nil {
+			*into = m
+		} else {
+			maps.Copy(*into, m)
+		}
+	}
+	return pkg
+}
+
 func (p *packageJSON) dep(name string) bool {
 	_, a := p.Dependencies[name]
 	_, b := p.DevDependencies[name]
@@ -70,6 +120,7 @@ func Detect(t Tree, root string) (*Detection, error) {
 		return dir + "/" + name
 	}
 	here := map[string]bool{}
+	seen := map[string]bool{}
 	var entries []string
 	for _, f := range t.Files() {
 		rel := f
@@ -84,7 +135,8 @@ func Detect(t Tree, root string) (*Detection, error) {
 		if !nested {
 			here[top] = true
 		}
-		if !slices.Contains(entries, top) {
+		if !seen[top] {
+			seen[top] = true
 			entries = append(entries, top)
 		}
 	}
@@ -109,10 +161,7 @@ func Detect(t Tree, root string) (*Detection, error) {
 		return &Detection{Rule: 1, Evidence: "Dockerfile", Kind: KindService}, nil
 	}
 	if here["package.json"] {
-		var pkg packageJSON
-		if err := json.Unmarshal(read("package.json"), &pkg, foreignJSON); err != nil {
-			pkg = packageJSON{}
-		}
+		pkg := readPackageJSON(read("package.json"))
 		build := "npm run build"
 		if here["bun.lock"] || here["bun.lockb"] {
 			build = "bun run build"

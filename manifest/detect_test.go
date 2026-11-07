@@ -4,7 +4,11 @@
 package manifest
 
 import (
+	"fmt"
+	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"latere.ai/x/apps/codes"
 )
@@ -87,5 +91,94 @@ func TestDetectionRules(t *testing.T) {
 	c, ok := codes.Lookup(CodeKindUndetectable)
 	if !ok || c.Message != "The platform could not tell whether this is a static site or a service." {
 		t.Errorf("rule 7's sentence = %q", c.Message)
+	}
+}
+
+// cutTree is a Tree like the platform's: ReadFile returns only the first
+// MaxDetectRead bytes of a file.
+type cutTree struct{ tree }
+
+func (c cutTree) ReadFile(name string) ([]byte, error) {
+	b, err := c.tree.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+	return b[:min(len(b), MaxDetectRead)], nil
+}
+
+// padDeps is a dependencies object past MaxDetectRead bytes.
+func padDeps() string {
+	return `{` + strings.Repeat(`"p":"1",`, MaxDetectRead/7+1) + `"q":"1"}`
+}
+
+// TestDetectLargePackageJSON: a package.json longer than MaxDetectRead
+// keeps the members read in full before the cut, so the rules still see
+// scripts that come first.
+func TestDetectLargePackageJSON(t *testing.T) {
+	deps := padDeps()
+	for _, tc := range []struct {
+		name string
+		tr   tree
+		rule int
+	}{
+		{"rule 2 start near the top", tree{"package.json": `{"scripts":{"start":"node s.js"},"dependencies":` + deps + `}`}, 2},
+		{"rule 3 build near the top", tree{"package.json": `{"scripts":{"build":"vite build"},"dependencies":` + deps + `}`, "vite.config.ts": ""}, 3},
+		{"rule 4 next in dependencies before the cut", tree{"package.json": `{"dependencies":{"next":"15"},"scripts":{"x":"` + strings.Repeat("a", MaxDetectRead) + `"}}`}, 4},
+		{"member names in another case, duplicates", tree{"package.json": `{"Scripts":{"a":"b"},"scripts":{"start":"x"},"description":"` + strings.Repeat("d", MaxDetectRead) + `"}`}, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if len(tc.tr["package.json"]) <= MaxDetectRead {
+				t.Fatalf("package.json is %d bytes, not over MaxDetectRead", len(tc.tr["package.json"]))
+			}
+			for name, tr := range map[string]Tree{"whole file": tc.tr, "cut by the tree": cutTree{tc.tr}} {
+				d, err := Detect(tr, ".")
+				if err != nil || d.Rule != tc.rule {
+					t.Errorf("%s: Detect = %+v, %v; want rule %d", name, d, err, tc.rule)
+				}
+			}
+		})
+	}
+}
+
+// TestDetectCutInsideScripts: a scripts object cut in the middle is dropped
+// whole, not kept in part. A half-read scripts object could hold start but
+// miss the build script that makes the app static, so detection fails
+// safe: it says undetectable instead of guessing.
+func TestDetectCutInsideScripts(t *testing.T) {
+	pkgJSON := `{"scripts":{"start":"node s.js","pad":"` + strings.Repeat("a", MaxDetectRead) + `","build":"vite build"}}`
+	_, err := Detect(tree{"package.json": pkgJSON, "vite.config.ts": ""}, ".")
+	refused(t, err, CodeKindUndetectable, "")
+}
+
+// TestDetectPackageJSONNotJSON: a package.json that is not a JSON object
+// reads as empty, as before.
+func TestDetectPackageJSONNotJSON(t *testing.T) {
+	for _, src := range []string{"", "not json", "[1,2]", `"scripts"`} {
+		d, err := Detect(tree{"package.json": src, "go.mod": ""}, ".")
+		if err != nil || d.Rule != 6 {
+			t.Errorf("package.json %q: Detect = %+v, %v; want rule 6", src, d, err)
+		}
+	}
+}
+
+// TestDetectIsLinearInEntries: Detect over many top-level files returns the
+// first 20 entries sorted, and finishes within a bound a quadratic scan of
+// the entries (seconds at this size) would miss by far.
+func TestDetectIsLinearInEntries(t *testing.T) {
+	const n = 200000
+	tr := make(tree, n)
+	for i := range n {
+		tr[fmt.Sprintf("f%06d.txt", i)] = ""
+	}
+	start := time.Now()
+	_, err := Detect(tr, ".")
+	took := time.Since(start)
+	e := refused(t, err, CodeKindUndetectable, "")
+	got, ok := e.Details["entries"].([]string)
+	if !ok || len(got) != 20 || !slices.IsSorted(got) || got[0] != "f000000.txt" {
+		t.Errorf("entries = %v", e.Details["entries"])
+	}
+	if took > 5*time.Second {
+		t.Errorf("Detect over %d top-level files took %v", n, took)
 	}
 }
