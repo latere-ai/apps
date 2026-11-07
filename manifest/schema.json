@@ -6,35 +6,60 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "name": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$", "description": "The app's slug."},
+    "name": {"$ref": "#/$defs/slug", "description": "The app's slug: lowercase letters, digits and single hyphens, up to 40 characters."},
     "kind": {"enum": ["static", "service"], "description": "Omit to detect."},
     "static": {"$ref": "#/$defs/static"},
     "service": {"$ref": "#/$defs/service"},
     "components": {
       "type": "object",
-      "propertyNames": {"pattern": "^[a-z][a-z0-9-]{0,19}$"},
+      "description": "The app's parts, by name. Use this instead of kind, static and service when the app has more than one part.",
+      "propertyNames": {"$ref": "#/$defs/name"},
       "additionalProperties": {"$ref": "#/$defs/component"}
     },
-    "links": {"type": "array", "maxItems": 10, "items": {"type": "string"}},
-    "build": {"type": "object", "additionalProperties": false, "properties": {"env": {"$ref": "#/$defs/env"}}},
+    "links": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/slug"}, "description": "Slugs of the other apps this app calls, each listed once."},
+    "build": {"type": "object", "additionalProperties": false, "properties": {"env": {"$ref": "#/$defs/buildEnv"}}},
     "env": {"$ref": "#/$defs/env"},
     "resources": {
       "type": "object",
-      "propertyNames": {"pattern": "^[a-z][a-z0-9-]{0,19}$"},
+      "propertyNames": {"$ref": "#/$defs/name"},
       "additionalProperties": {"$ref": "#/$defs/resource"}
     }
   },
+  "allOf": [{"$ref": "#/$defs/kindKeys"}],
   "dependentSchemas": {
     "components": {"not": {"anyOf": [{"required": ["kind"]}, {"required": ["static"]}, {"required": ["service"]}]}}
   },
   "$defs": {
-    "env": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean"]}},
+    "slug": {"type": "string", "maxLength": 40, "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+    "name": {"maxLength": 20, "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$", "description": "Lowercase letters, digits and single hyphens, starting with a letter, up to 20 characters."},
+    "path": {
+      "type": "string",
+      "not": {"pattern": "^/|(^|/)\\.\\.(/|$)"},
+      "description": "A folder or file inside the repository: not absolute and without a .. segment."
+    },
+    "quantity": {"type": "string", "pattern": "^\\+?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)(Ki|Mi|Gi|Ti|Pi|Ei|[numkMGTPE]|[eE][+-]?[0-9]+)?$", "description": "An amount such as 256Mi, 1Gi or 500m."},
+    "kindKeys": {
+      "allOf": [
+        {"if": {"required": ["kind"], "properties": {"kind": {"const": "static"}}}, "then": {"not": {"required": ["service"]}}},
+        {"if": {"required": ["kind"], "properties": {"kind": {"const": "service"}}}, "then": {"not": {"required": ["static"]}}}
+      ]
+    },
+    "env": {
+      "type": "object",
+      "description": "Variables set in the running app. A value may hold ${{ app.url }}, ${{ app.slug }}, ${{ components.NAME.url }}, ${{ links.SLUG.url }} or ${{ resources.NAME.FIELD }}.",
+      "additionalProperties": {"type": ["string", "number", "boolean"], "pattern": "^([^$]|\\$+(\\{\\$+)*\\{?[^${]|(\\$+\\{)*\\$*\\$\\{\\{[ \\t\\n\\f\\r]*(app\\.(url|slug)|components\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.url|links\\.[a-z0-9]+(-[a-z0-9]+)*\\.url|resources\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.(url|host|port|name|user|password))[ \\t\\n\\f\\r]*\\}\\})*(\\$+(\\{\\$+)*\\{?)?$"}
+    },
+    "buildEnv": {
+      "type": "object",
+      "description": "Variables set while building. They cannot hold ${{ }} references.",
+      "additionalProperties": {"type": ["string", "number", "boolean"], "pattern": "^([^$]|\\$+(\\{\\$+)*\\{?[^${])*(\\$+(\\{\\$+)*\\{?)?$"}
+    },
     "static": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "build": {"type": "string"},
-        "dir": {"type": "string"},
+        "dir": {"$ref": "#/$defs/path", "description": "The folder to publish, relative to the component."},
         "spa": {"type": "boolean"},
         "sitemap": {"type": "boolean"},
         "headers": {
@@ -42,9 +67,12 @@
           "maxItems": 20,
           "items": {
             "type": "object",
+            "description": "A path pattern and the response headers to set on it. A rule sets at least one header, and cannot set Content-Length, Content-Encoding, Set-Cookie or X-Latere-*.",
             "required": ["path"],
-            "properties": {"path": {"type": "string", "pattern": "^/"}},
-            "additionalProperties": {"type": "string"}
+            "minProperties": 2,
+            "properties": {"path": {"type": "string", "pattern": "^/[^\u0000-\u0008\u000a-\u001f\u007f]*$"}},
+            "propertyNames": {"pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$", "not": {"pattern": "^([Cc][Oo][Nn][Tt][Ee][Nn][Tt]-([Ll][Ee][Nn][Gg][Tt][Hh]|[Ee][Nn][Cc][Oo][Dd][Ii][Nn][Gg])$|[Ss][Ee][Tt]-[Cc][Oo][Oo][Kk][Ii][Ee]$|[Xx]-[Ll][Aa][Tt][Ee][Rr][Ee]-)"}},
+            "additionalProperties": {"type": "string", "pattern": "^[^\u0000-\u0008\u000a-\u001f\u007f]*$"}
           }
         }
       }
@@ -56,23 +84,27 @@
         "builder": {"enum": ["jammy-base", "jammy-full"]},
         "start": {"type": "string"},
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
-        "health": {"type": "string", "pattern": "^/"},
+        "health": {"type": "string", "pattern": "^/([^/\u0000-\u0020\u007f-\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000][^\u0000-\u0020\u007f-\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*)?$", "description": "A path on the service that starts with one slash and holds no spaces."},
         "resources": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {"memory": {"type": "string"}, "cpu": {"type": "string"}}
+          "properties": {"memory": {"$ref": "#/$defs/quantity"}, "cpu": {"$ref": "#/$defs/quantity"}}
         },
         "replicas": {
           "type": "object",
           "additionalProperties": false,
           "properties": {"min": {"type": "integer", "minimum": 0}, "max": {"type": "integer", "minimum": 0}}
         },
-        "public_paths": {"type": "array", "maxItems": 10, "items": {"type": "string", "pattern": "^/"}},
+        "public_paths": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {"type": "string", "pattern": "^/[A-Za-z0-9._~/-]*\\*?$", "description": "A path that starts with a slash; a * is allowed only at the end."}
+        },
         "forward_authorization": {"type": "boolean"},
         "dockerfile": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {"path": {"type": "string"}, "target": {"type": "string"}}
+          "properties": {"path": {"$ref": "#/$defs/path"}, "target": {"type": "string"}}
         },
         "migrate": {"type": "string", "maxLength": 1000}
       }
@@ -82,15 +114,20 @@
       "additionalProperties": false,
       "properties": {
         "kind": {"enum": ["static", "service", "worker", "cron"]},
-        "path": {"type": "string"},
-        "route": {"type": "string", "pattern": "^/"},
+        "path": {"$ref": "#/$defs/path", "description": "The component's folder, relative to the repository root. Omit for the root."},
+        "route": {"type": "string", "pattern": "^(/|(/([A-Za-z0-9_~-]|\\.[A-Za-z0-9_~-]|\\.\\.[A-Za-z0-9._~-])[A-Za-z0-9._~-]*)+)$", "description": "Where the component is served: / or a path such as /api, with no trailing slash."},
         "strip_prefix": {"type": "boolean"},
         "static": {"$ref": "#/$defs/static"},
         "service": {"$ref": "#/$defs/service"},
         "env": {"$ref": "#/$defs/env"},
         "schedule": {"type": "string"},
         "start": {"type": "string"}
-      }
+      },
+      "allOf": [{"$ref": "#/$defs/kindKeys"}],
+      "anyOf": [
+        {"required": ["route"]},
+        {"required": ["kind"], "properties": {"kind": {"enum": ["worker", "cron"]}}}
+      ]
     },
     "resource": {
       "type": "object",
@@ -98,9 +135,11 @@
       "required": ["type"],
       "properties": {
         "type": {"enum": ["postgres", "cache"]},
-        "size": {"type": "string"},
+        "size": {"$ref": "#/$defs/quantity"},
         "preview": {"enum": ["copy", "empty"]}
-      }
+      },
+      "if": {"required": ["type"], "properties": {"type": {"const": "cache"}}},
+      "then": {"not": {"anyOf": [{"required": ["size"]}, {"required": ["preview"]}]}, "description": "A cache has no size or preview."}
     }
   }
 }
