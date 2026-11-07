@@ -10,14 +10,85 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Added
+
+- **`manifest_too_large`,** a 400 for a `latere-app.yaml` over 64 KiB
+  (`manifest.MaxFileBytes`) or with more than 1000 lines holding a key.
+  The details carry `limit` (`bytes` or `keys`) and `max`.
+- `manifest_invalid` has four new reasons: `depth` (more than 32 levels
+  of brackets or list markers, counted in quoted values too), `anchor` (a
+  YAML anchor or alias), `tag` (a YAML tag such as `!!binary`) and
+  `documents` (more than one YAML document).
+
+### Changed
+
+- **`manifest.Parse` refuses YAML anchors, aliases, tags and a second
+  document.** The grammar uses none of them. A manifest that does is
+  refused with `manifest_invalid`; write the values out in one document.
+- `service.port`, `service.replicas.min` and `service.replicas.max` must
+  be integers. `8080.5`, `"8080"` and `1.9` are refused with reason
+  `type`; before, they were cut to an integer.
+- A component or resource name may not end with a hyphen or hold two in a
+  row, and the app's `name` and every item of `links` must be a slug: 1
+  to 40 lowercase letters, digits and single hyphens, with no hyphen at
+  either end. A link listed twice is refused.
+- A route and a public path use only letters, digits and `. _ ~ / -`, and
+  a health check may not start with `//`.
+- A header rule's names must be HTTP tokens, and its values may hold no
+  control character other than a tab.
+- Memory, CPU and database sizes are read by the Kubernetes quantity
+  grammar: an exponent such as `1e3` and the suffixes P, E, Pi and Ei now
+  read, and hexadecimal numbers and digit underscores do not.
+- **`manifest.Resolve` with the zero `Options.Limits` checks against
+  `DefaultLimits`.** Before, it refused every manifest. A `Limits` whose
+  memory, CPU or database size does not read is now an error from
+  `Resolve` rather than no ceiling.
+- **The JSON Schema states every rule that needs neither the app's files
+  nor the platform's limits,** so an editor refuses what `Resolve` would:
+  names and slugs, unique links, a route on each component of the
+  components form, header rules, routes, public paths, health checks,
+  quantities, paths that leave the tree, references in env values, and a
+  cache with a size. `links` no longer has `maxItems`: the count is the
+  platform's limit. A value written as `8080.0` still passes the schema
+  and is refused by `Parse`, since JSON Schema counts it as an integer.
+- The hints of `source_too_many_files`, `detect_failed`,
+  `upstream_error`, `upstream_timeout`, `misdirected` and
+  `kind_undetectable` name steps that work: no `.latereignore`, no
+  `latere app` commands, no Dockerfile, no platform address.
+
+### Fixed
+
+- A quoted key, such as `"kind": static`, and a manifest in JSON form are
+  read as keys. Before, they were refused as unknown.
+- A leading UTF-8 byte order mark is ignored instead of making the first
+  key unknown.
+- A directory named `..foo` is inside the tree. A route's refusal names
+  its line. `service.migrate` is limited to 1000 characters, not bytes.
+- `manifest.Detect` reads a `package.json` cut at 64 KiB up to the cut,
+  so the scripts and dependencies before it still count. Detection takes
+  time linear in the number of top-level files.
+
+### Security
+
+- **`manifest.Parse` bounds the memory and time a manifest can cost,**
+  through the limits on size, keys and nesting and the refusal of
+  aliases. Before, a small file could cost far more memory than its size.
+  An anchored mapping also hid unknown keys from the check.
+- `manifest.Resolve` checks a header rule's names and values in full, so a
+  reserved header cannot pass in another form.
+- A ceiling in `Options.Limits` that did not read was treated as no
+  ceiling, and quantities Kubernetes refuses were accepted.
+
 ## v0.0.4 - 2026-11-05
 
 ### Changed
 
 - **`manifest` and `authorizer` use `encoding/json/v2`.** Manifests and
-  limits encode to the same bytes as before, under either JSON package, so a
-  consumer that writes these types gets the omission rules this package
-  documents. Manifest files are read as leniently as before: duplicate keys,
+  limits encode to the same members as before, under either JSON package, so
+  a consumer that writes these types gets the omission rules this package
+  documents. The keys of a map, such as a manifest's `env`, are not sorted
+  by `encoding/json/v2` unless the caller passes `json.Deterministic(true)`.
+  `package.json` files are read as leniently as before: duplicate keys,
   invalid UTF-8 and any letter case in names are accepted.
 - Requires `latere.ai/x/pkg` v0.113.0.
 
@@ -35,12 +106,10 @@ committed: the commit log already holds that.
 
 ### Security
 
-- Built with Go 1.27.2, which fixes GO-2026-6611, GO-2026-6612, GO-2026-6613 and GO-2026-6617.
-
-### Fixed
-
-- **Built with Go 1.27.3,** which fixes GO-2026-6809, a flaw in the
-  standard library's certificate verification.
+- **Built and tested with Go 1.27.3,** which fixes GO-2026-6611,
+  GO-2026-6612, GO-2026-6613, GO-2026-6617 and GO-2026-6809. A program that
+  imports this module builds with its own Go, so build it with 1.27.3 or
+  later.
 
 ## v0.0.2 - 2026-10-04
 
