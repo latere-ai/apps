@@ -3,7 +3,7 @@
 
 // Package codes is the registry of every error code Latere Apps answers
 // with: the code, its HTTP status, the one user sentence, and the one
-// hint. The API renders an error from this table, the CLI prints the same
+// hint. The API renders an error from this table, a client prints the same
 // sentence offline from the copy it was compiled with, and the docs render
 // the table from this package, so the three cannot disagree. The package
 // depends on the standard library alone, so a client imports it without a
@@ -109,7 +109,7 @@ var Codes = map[string]Code{
 		Hint:    "Deploy again. If it happens twice, the platform is looking into it."},
 	"source_too_many_files": {Name: "source_too_many_files", Status: 400,
 		Message: "The app has more files than a deploy allows.",
-		Hint:    "Add the largest directories to `.latereignore` and deploy again. `latere app deploy --check` shows them."},
+		Hint:    "Remove generated directories, such as `node_modules` or build output, from the app's files and deploy again."},
 	"source_path_traversal": {Name: "source_path_traversal", Status: 400,
 		Message: "The upload contains a path the platform refuses.",
 		Hint:    "Remove paths with `..` or absolute paths and deploy again."},
@@ -127,7 +127,7 @@ var Codes = map[string]Code{
 		Hint:    "Reduce the output or move large files to object storage."},
 	"detect_failed": {Name: "detect_failed", Status: 422,
 		Message: "The platform could not tell how to run this app.",
-		Hint:    "Set `kind` and `service.start` in `latere-app.yaml`, or add a Dockerfile."},
+		Hint:    "Set `kind` and `service.start` in `latere-app.yaml`."},
 	"build_timeout": {Name: "build_timeout", Status: 422,
 		Message: "The build ran longer than its time limit and was stopped.",
 		Hint:    "Make the build faster, or split the app into components."},
@@ -167,13 +167,13 @@ var Codes = map[string]Code{
 		Hint:    "Resume it from the console."},
 	"upstream_error": {Name: "upstream_error", Status: 502,
 		Message: "The application did not answer.",
-		Hint:    "Check its logs with `latere app logs`."},
+		Hint:    "Try again in a minute."},
 	"upstream_timeout": {Name: "upstream_timeout", Status: 504,
 		Message: "The application took too long to answer.",
-		Hint:    "Check its logs with `latere app logs`."},
+		Hint:    "Try again in a minute."},
 	"misdirected": {Name: "misdirected", Status: 421,
 		Message: "This address is not served here.",
-		Hint:    "Use a `latere.site` address."},
+		Hint:    "Open the app at the address it was given."},
 	"body_too_large": {Name: "body_too_large", Status: 413,
 		Message: "The request is larger than 32 MiB.",
 		Hint:    "Send less data per request."},
@@ -190,6 +190,9 @@ var Codes = map[string]Code{
 	"manifest_unknown_key": {Name: "manifest_unknown_key", Status: 400,
 		Message: "`latere-app.yaml` has a key the platform does not know.",
 		Hint:    "Check the key against the reference at platform.latere.ai/docs/apps/manifest."},
+	"manifest_too_large": {Name: "manifest_too_large", Status: 400,
+		Message: "`latere-app.yaml` is larger than the platform reads.",
+		Hint:    "Keep the file under 64 KiB and 1000 keys."},
 	"manifest_shape_conflict": {Name: "manifest_shape_conflict", Status: 400,
 		Message: "`latere-app.yaml` mixes `components:` with the single-component keys.",
 		Hint:    "Keep either `components:` or the top-level `kind`, `static`, and `service` keys."},
@@ -219,7 +222,7 @@ var Codes = map[string]Code{
 		Hint:    "Remove the app's own slug from `links:`."},
 	"kind_undetectable": {Name: "kind_undetectable", Status: 400,
 		Message: "The platform could not tell whether this is a static site or a service.",
-		Hint:    "Set `kind: static` or `kind: service` in `latere-app.yaml`, or add a `package.json` with a build or start script."},
+		Hint:    "Set `kind: static` or `kind: service` in `latere-app.yaml`, or add a `package.json` with a `start` script."},
 	"dockerfile_unsupported": {Name: "dockerfile_unsupported", Status: 400,
 		Message: "Dockerfile builds are not available yet.",
 		Hint:    "Set `kind: static` or `kind: service` in `latere-app.yaml` to build without the Dockerfile."},
