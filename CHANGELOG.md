@@ -22,6 +22,8 @@ committed: the commit log already holds that.
 
 ### Changed
 
+- Built with Go 1.27.4, which fixes GO-2026-6859.
+
 - **`manifest.Parse` refuses YAML anchors, aliases, tags and a second
   document.** The grammar uses none of them. A manifest that does is
   refused with `manifest_invalid`; write the values out in one document.
